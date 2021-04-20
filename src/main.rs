@@ -1,45 +1,45 @@
 use std::{
-    thread::{
-    spawn,
-    sleep,
-    JoinHandle
-}
-    time::{
-        Duration
-    }
+    sync::mpsc::{channel, Sender},
+    thread::{spawn, JoinHandle},
 };
 
-macro_rules! to_str {
-    ($string:expr) => {
-      String::from($string)
-  };
+struct Job(JoinHandle<()>, Sender<Box<dyn FnOnce() + Send>>);
+
+impl Job {
+    fn new() -> Job {
+        let (transmitter, reciever) = channel::<Box<dyn FnOnce() + Send>>();
+        Job(spawn(move || {
+            loop {
+                let recv_job = reciever.recv().unwrap();
+                recv_job();
+            }
+        }), transmitter)
+    }
+}
+
+trait Start {
+    fn send(&self, task:Box<dyn FnOnce() + Send>) -> ();
+}
+
+impl Start for Job {
+    fn send(&self, task:Box<dyn FnOnce() + Send>) {
+        self.1.send(task).unwrap();
+    }
 }
 
 #[tokio::main]
 async fn main() {
-    let to_string_string = to_str!("Hello world!");
-
-    println!("{:?}", to_string_string);
-
-    timer().await;
-    println!("async this time?");
+    threadpool(vec![Job::new(), Job::new()]);
 }
 
-async fn timer() {
-    let mut jobs: Vec<JoinHandle<()>> = vec![];
-
-    for i in 0..5 {
-        jobs.push(
-            spawn(move ||
-                loop {
-                    println!("Async jobs go! {}", i);
-                    sleep();
-                }
-            )
-        )
-    }
+fn threadpool(jobs: Vec<Job>) {
 
     for job in jobs {
-        job.join().unwrap();
+        loop {
+            job.send(Box::new(|| {
+                println!("Hello world!");
+            }));
+        }
+        
     }
 }
