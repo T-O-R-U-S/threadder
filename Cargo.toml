@@ -6,5 +6,5 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-"tokio" = {version="*", features=["full"]}
-derefable = "0.1.0"
+futures = "0.3.14"
+"tokio" = { version = "1.5.0", features = ["full"] }
