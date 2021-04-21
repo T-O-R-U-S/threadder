@@ -1,8 +1,7 @@
 use std::{
     panic::panic_any,
     sync::mpsc::{channel, Sender, TryRecvError},
-    thread::{spawn, JoinHandle, sleep},
-    time::Duration
+    thread::{spawn, JoinHandle},
 };
 
 pub struct Job(JoinHandle<()>, Sender<Box<dyn FnOnce() + Send>>);
@@ -90,7 +89,9 @@ fn test_safe_exit() {
         my_threadpool.send(
             Box::new(|| {
                 println!("Goodnight, world!");
-                sleep(Duration::from_secs(3));
+                std::thread::sleep(
+                    std::time::Duration::from_secs(3)
+                );
                 println!("Goodmorning, world!");
             })
         );
