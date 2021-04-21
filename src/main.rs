@@ -76,8 +76,8 @@ impl ThreadPoolManagement for ThreadPool {
     }
 }
 
-#[tokio::main]
-async fn main() {
+
+fn main() {
     let mut thread_pool = ThreadPool::new(3);
     thread_pool.send(Box::new(|| {
         println!("Hello world!");
@@ -91,7 +91,7 @@ async fn main() {
         println!("Hello world!");
         println!("Hello world!!!!!");
     }));
-
+    thread_pool.stop();
     /*
     let mut job_pool:Vec<Job> = vec![];
     for _ in 0..10 {
