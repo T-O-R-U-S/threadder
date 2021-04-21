@@ -61,8 +61,8 @@ impl ThreadPool {
     }
 }
 
-
-fn main() {
+#[test]
+fn send_thread() {
     let mut thread_pool = ThreadPool::new(3);
     thread_pool.send(Box::new(|| {
         println!("Hello world!");
@@ -77,13 +77,6 @@ fn main() {
         println!("Hello world!!!!!");
     }));
     thread_pool.stop();
-    /*
-    let mut job_pool:Vec<Job> = vec![];
-    for _ in 0..10 {
-        &job_pool.push(Job::new());
-    }
-    threadpool(job_pool);
-    */
 }
 /*
 fn threadpool(jobs: Vec<Job>) {
