@@ -20,14 +20,7 @@ impl Job {
             transmitter,
         )
     }
-}
-
-trait Threading {
-    fn send(&self, task: Box<dyn FnOnce() + Send>) -> Result<(), &'static str>;
-}
-
-impl Threading for Job {
-    fn send(&self, task: Box<dyn FnOnce() + Send>) -> Result<(), &'static str> {
+    pub fn send(&self, task: Box<dyn FnOnce() + Send>) -> Result<(), &'static str> {
         self.1.send(task).unwrap();
         Ok(())
     }
@@ -35,13 +28,8 @@ impl Threading for Job {
 
 pub struct ThreadPool(Vec<Job>, usize);
 
-trait ThreadPoolManagement {
-    fn send(&mut self, task: Box<dyn FnOnce() + Send>) -> ();
-    fn stop(self) -> ();
-}
-
 impl ThreadPool {
-    pub fn new(num_threads: u16) -> ThreadPool {
+    pub fn new(num_threads: usize) -> ThreadPool {
         let mut threads = vec![];
         if num_threads == 0 {
             panic_any("Empty threadpool!")
@@ -51,10 +39,7 @@ impl ThreadPool {
         }
         ThreadPool(threads, 1)
     }
-}
-
-impl ThreadPoolManagement for ThreadPool {
-    fn send(&mut self, task: Box<dyn FnOnce() + Send>) {
+    pub fn send(&mut self, task: Box<dyn FnOnce() + Send>) {
         if self.0.len() == 0 {
             panic_any("Empty threadpool!")
         }
@@ -68,7 +53,7 @@ impl ThreadPoolManagement for ThreadPool {
         .expect("Failed to send task to thread");
         self.1 += 1;
     }
-    fn stop(self) {
+    pub fn stop(self) {
         for thread in self.0 {
             drop(thread.1);
             thread.0.join().unwrap();
