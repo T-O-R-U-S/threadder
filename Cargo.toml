@@ -2,8 +2,8 @@
 name = "threadder"
 version = "0.1.0"
 edition = "2018"
-author = "T-O-R-U-S"
+authors = ["T-O-R-U-S"]
+description = "A multi-threading implementation that does not rely on Futures."
+repository = ""
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
