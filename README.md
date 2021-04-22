@@ -14,6 +14,7 @@ fn main() {
     // Create a 4-thread threadpool
     let mut my_threadpool = ThreadPool::new(4);
     for _ in 0..4 {
+        // Clojures can (optionally) be boxed.
         my_threadpool.send(
             || {
                 println!("Goodnight, world!");
