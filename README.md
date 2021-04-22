@@ -6,7 +6,8 @@ Examples:
 use std::{
     thread::sleep,
     time::Duration
-}
+};
+use threadder::ThreadPool;
 
 fn main() {
     // Warning: Threadpools MUST be declared as mutable!
