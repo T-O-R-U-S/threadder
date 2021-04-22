@@ -1,29 +1,28 @@
 /*!
- The Threadder crate is a simple threadpool crate. It can be used like so:
- ```rust
-  use threadder::ThreadPool;
-  use std::thread::sleep;
-  use std::time::Duration;
- 
-  fn main() {
-    // MUST be mutable so that instructions may be sent to thread!
-    let mut my_threadpool = ThreadPool::new(2);
-    // ThreadPool::new()'s parameter is equal to number of cores. Must be a usize larger than 0.
-    for _ in 0..4 {
-      my_threadpool.send(Box::new(|| {
-          // Simulate heavy load
-          sleep(Duration::from_secs(4));
-          println!("hello world!")
-        })
-      );
-    }
-  }
-  ```
- */
+The Threadder crate is a simple threadpool crate. It can be used like so:
+```rust
+ use threadder::ThreadPool;
+ use std::thread::sleep;
+ use std::time::Duration;
 
+ fn main() {
+   // MUST be mutable so that instructions may be sent to thread!
+   let mut my_threadpool = ThreadPool::new(2);
+   // ThreadPool::new()'s parameter is equal to number of cores. Must be a usize larger than 0.
+   for _ in 0..4 {
+     my_threadpool.send(Box::new(|| {
+         // Simulate heavy load
+         sleep(Duration::from_secs(4));
+         println!("hello world!")
+       })
+     );
+   }
+ }
+ ```
+*/
 use std::{
     panic::panic_any,
-    sync::mpsc::{channel, Sender, TryRecvError},
+    sync::mpsc::{channel, Receiver, Sender, TryRecvError},
     thread::{spawn, JoinHandle},
 };
 
@@ -31,7 +30,7 @@ use std::{
  * The TaskCarrier struct is a thread that can have tasks sent to it.
  * ```rust
  * use threadder::TaskCarrier;
- * 
+ *
  * fn main() {
  *  let my_job = TaskCarrier::new();
  *  my_job.send(
@@ -44,10 +43,25 @@ pub struct TaskCarrier<T>(JoinHandle<()>, Sender<T>);
 
 impl<T> TaskCarrier<T> {
     /**
+     * Ran in every TaskCarrier thread -- listens for tasks from main thread.
+     */
+    pub fn listen(reciever: Receiver<T>) -> ()
+    where
+        T: FnOnce() + 'static + Send,
+    {
+        loop {
+            match reciever.try_recv() {
+                Ok(data) => data(),
+                Err(TryRecvError::Disconnected) => break,
+                Err(TryRecvError::Empty) => {}
+            };
+        }
+    }
+    /**
      * Makes a new TaskCarrier type. This is the easiest clean way to make a new TaskCarrier.
      * ```rust
      * use threadder::TaskCarrier;
-     * 
+     *
      * fn main() {
      *  let my_taskcarrier = TaskCarrier::new();
      *  my_taskcarrier.send(|| {
@@ -57,24 +71,17 @@ impl<T> TaskCarrier<T> {
      * ```
      */
     pub fn new() -> TaskCarrier<T>
-        where T: FnOnce() + 'static + Send {
+    where
+        T: FnOnce() + 'static + Send,
+    {
         let (transmitter, reciever) = channel::<T>();
-        TaskCarrier::<T>(
-            spawn(move || loop {
-                match reciever.try_recv() {
-                    Ok(data) => data(),
-                    Err(TryRecvError::Disconnected) => break,
-                    Err(TryRecvError::Empty) => {}
-                };
-            }),
-            transmitter,
-        )
+        TaskCarrier::<T>(spawn(move || TaskCarrier::listen(reciever)), transmitter)
     }
     /**
      * Sends a task to a thread
      * ```rust
      * use threadder::TaskCarrier;
-     * 
+     *
      * fn main() {
      *  let my_job = TaskCarrier::new();
      *  my_job.send(
@@ -84,39 +91,43 @@ impl<T> TaskCarrier<T> {
      * ```
      */
     pub fn send(&self, task: T) -> Result<(), &'static str>
-        where T: FnOnce() + 'static + Send {
+    where
+        T: FnOnce() + 'static + Send,
+    {
         self.1.send(task).unwrap();
         Ok(())
     }
 }
 
 /**
- The main attraction -- a threadpooling solution.
- ```rust
-  use threadder::ThreadPool;
-  use std::thread::sleep;
-  use std::time::Duration;
- 
-  fn main() {
-    // MUST be mutable so that instructions may be sent to thread!
-    let mut my_threadpool = ThreadPool::new(2);
-    // ThreadPool::new()'s parameter is equal to number of cores. Must be above 0, and a usize!
-    for _ in 0..4 {
-      my_threadpool.send(Box::new(|| {
-          // Simulate heavy load
-          sleep(Duration::from_secs(4));
-          println!("hello world!")
-        })
-      );
-    }
-  }
-  ```
- */
+The main attraction -- a threadpooling solution.
+```rust
+ use threadder::ThreadPool;
+ use std::thread::sleep;
+ use std::time::Duration;
+
+ fn main() {
+   // MUST be mutable so that instructions may be sent to thread!
+   let mut my_threadpool = ThreadPool::new(2);
+   // ThreadPool::new()'s parameter is equal to number of cores. Must be above 0, and a usize!
+   for _ in 0..4 {
+     my_threadpool.send(Box::new(|| {
+         // Simulate heavy load
+         sleep(Duration::from_secs(4));
+         println!("hello world!")
+       })
+     );
+   }
+ }
+ ```
+*/
 pub struct ThreadPool<T>(Vec<TaskCarrier<T>>, usize);
 
 impl<T> ThreadPool<T> {
     pub fn new(num_threads: usize) -> ThreadPool<T>
-        where T: FnOnce() + 'static + Send {
+    where
+        T: FnOnce() + 'static + Send,
+    {
         let mut threads = Vec::with_capacity(num_threads);
         if num_threads == 0 {
             panic_any("Empty threadpool!")
@@ -127,7 +138,9 @@ impl<T> ThreadPool<T> {
         ThreadPool(threads, 1)
     }
     pub fn send(&mut self, task: T)
-        where T: FnOnce() + 'static + Send {
+    where
+        T: FnOnce() + 'static + Send,
+    {
         if self.0.len() == 0 {
             panic_any("Empty threadpool!")
         }
@@ -150,7 +163,7 @@ impl<T> ThreadPool<T> {
 }
 
 #[test]
-// Sends 3 tasks to the threadpool
+// Sends 3 tasks to a 3-core threadpool. Typical use-case.
 fn send_thread() {
     let mut thread_pool = ThreadPool::new(3);
     for _ in 0..3 {
@@ -166,16 +179,14 @@ fn single_thread_test() {
     let mut threadpool = ThreadPool::new(1);
     for _ in 0..3 {
         threadpool.send(Box::new(|| {
-            std::thread::sleep(
-                std::time::Duration::from_secs(2)
-            );
+            std::thread::sleep(std::time::Duration::from_secs(2));
             println!("Hello world!");
         }));
     }
 }
 #[test]
-// Tests if thread exits properly
-// Expected duration 3 seconds
+// Tests if threads exit properly
+// Expected duration: 3 seconds
 fn test_safe_exit() {
     // Warning: Threadpools MUST be declared as mutable!
     // Create a 4-thread threadpool
@@ -211,16 +222,23 @@ fn test_load_balance() {
     my_threadpool.stop()
 }
 
-/*
 #[test]
-fn threadpool(jobs: Vec<TaskCarrier>) {
+// Test manual summoning of TaskCarriers -- not sure why someone would wish to do this,
+// but I must accomodate that person nonetheless.
+fn manual_taskcarrier() {
+    let (tx, rx) = channel();
+    let jobs = [TaskCarrier::<Box<dyn FnOnce() + 'static + Send>>(
+        spawn(|| TaskCarrier::listen(rx)),
+        tx,
+    )];
+
     for job in jobs.iter() {
         job.send(Box::new(move || {
             println!("Hello world!");
-        }));
-        job.send(Box::new(move || {
+        }))
+        .unwrap();
+        job.send(Box::new(|| {
             println!("Hey there!");
-        }));
+        })).unwrap();
     }
 }
-*/
